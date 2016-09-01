@@ -1,7 +1,5 @@
 package tw.supra.infernalaffairs;
 
-import tw.supra.infernalaffairs.util.SystemUiHider;
-
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.os.Build;
@@ -9,6 +7,11 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.MotionEvent;
 import android.view.View;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+
+import tw.supra.infernalaffairs.util.SystemUiHider;
 
 
 /**
@@ -40,11 +43,32 @@ public class FullscreenActivity extends Activity {
      * The flags to pass to {@link SystemUiHider#getInstance}.
      */
     private static final int HIDER_FLAGS = SystemUiHider.FLAG_HIDE_NAVIGATION;
-
+    private static final int REQUEST_CODE_GOOGLE_ERRORDIALOG = 0;
+    Handler mHideHandler = new Handler();
     /**
      * The instance of the {@link SystemUiHider} for this activity.
      */
     private SystemUiHider mSystemUiHider;
+    Runnable mHideRunnable = new Runnable() {
+        @Override
+        public void run() {
+            mSystemUiHider.hide();
+        }
+    };
+    /**
+     * Touch listener to use for in-layout UI controls to delay hiding the
+     * system UI. This is to prevent the jarring behavior of controls going away
+     * while interacting with activity UI.
+     */
+    View.OnTouchListener mDelayHideTouchListener = new View.OnTouchListener() {
+        @Override
+        public boolean onTouch(View view, MotionEvent motionEvent) {
+            if (AUTO_HIDE) {
+                delayedHide(AUTO_HIDE_DELAY_MILLIS);
+            }
+            return false;
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -125,29 +149,19 @@ public class FullscreenActivity extends Activity {
         delayedHide(100);
     }
 
-
-    /**
-     * Touch listener to use for in-layout UI controls to delay hiding the
-     * system UI. This is to prevent the jarring behavior of controls going away
-     * while interacting with activity UI.
-     */
-    View.OnTouchListener mDelayHideTouchListener = new View.OnTouchListener() {
-        @Override
-        public boolean onTouch(View view, MotionEvent motionEvent) {
-            if (AUTO_HIDE) {
-                delayedHide(AUTO_HIDE_DELAY_MILLIS);
-            }
-            return false;
+    @Override
+    protected void onResume() {
+        super.onResume();
+        GoogleApiAvailability googleApiAvailability = GoogleApiAvailability.getInstance();
+        int errorCode = googleApiAvailability.isGooglePlayServicesAvailable(this);
+        switch (errorCode) {
+            case ConnectionResult.SUCCESS:
+                break;
+            default:
+                googleApiAvailability.getErrorDialog(this, errorCode, REQUEST_CODE_GOOGLE_ERRORDIALOG);
+                break;
         }
-    };
-
-    Handler mHideHandler = new Handler();
-    Runnable mHideRunnable = new Runnable() {
-        @Override
-        public void run() {
-            mSystemUiHider.hide();
-        }
-    };
+    }
 
     /**
      * Schedules a call to hide() in [delay] milliseconds, canceling any
